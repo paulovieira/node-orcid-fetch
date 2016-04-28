@@ -13,6 +13,8 @@ var Chalk = require("chalk");
 var Ora = require('ora');
 var Wreck = Promise.promisifyAll(require('wreck'), {multiArgs: true});
 var Fs = Promise.promisifyAll(require('fs'));
+var XmlToJs = require("xml2js");
+var CsvParseAsync = Promise.promisify(require("csv-parse"));
 
 var internals = {};
 
@@ -20,26 +22,100 @@ internals.baseUrl = 'https://pub.orcid.org/'
 
 //internals.bearer = readBearerToken();
 //console.log("internals.bearer", internals.bearer)
-var orcIds = [
-    '0000-0002-1663-6594',  // pedro garret
-    '0000-0001-6897-2074',  // paulo vieira
-];
+// var orcIds = [
+//     '0000-0002-1663-6594',  // pedro garret
+//     '0000-0001-6897-2074',  // paulo vieira
+// ];
+
+var orcIds = [], names = [];
 
 // process.on("SIGINT", function(){
 //     console.log("\nAborting operation. Goodbye!");
 // })
+
+//var csvData = Fs.readFileSync('./ORCID CCIAM - Folha1.csv', 'utf8');
+
+
+var p1 = Promise.resolve();
+
+p1 = p1.then(function(){
+
+    return Fs.readFileAsync('./ORCID CCIAM - Folha1.csv', 'utf8');
+})
+.then(function(csvData){
+
+    return CsvParseAsync(csvData);
+})
+.then(function(array){
+    
+    //console.log(array);
+    array.forEach(function(pair, i){
+
+        if(i===0){ return; }
+
+        orcIds.push(pair[0]);
+        names.push(pair[1]);
+    });
+})
+.catch(function(err){
+
+    throw err;
+})
+.then(function(){
+
+    var p2 = Promise.resolve();
+    orcIds.forEach(function(orcId, i){
+        //return;
+        // todo: format (json/xml)
+        p2 = p2.then(function(){
+
+                return fetch(orcId, 'json');        
+            })
+            .then(function(obj){
+
+                //console.log("fetched data for " + obj.orcId + " (" +  obj.name + ")")
+
+                // todo: create option + directory for the output
+                return Fs.writeFileAsync(orcId + '.' + obj.format, obj.payload);
+            })
+            // todo: separate catch for some error related to writeFileAsync
+            .catch(function(err){
+
+                // todo: red
+                console.log(Chalk.red(`  ERROR: profile with orcid ${ err.orcId } was not retrieved - "Status: ${ err.statusCode } ${ err.message }"`));
+
+            });
+       
+    })
+})
+.then(function(){
+
+    //console.log("all done!")
+})
+
+/*
+CsvParse(csvData, {}, function(err, data){
+
+    if(err){
+        throw err;
+    }
+
+    console.log(data)
+})
+*/
 
 function fetch(orcId, format){
 
     //var uri = `/v1.2/${ orcId }/orcid-profile/`;
     var uri = '/v1.2/' + orcId + '/orcid-profile/';
 
+    // TODO: read bearer from the file
     var options = {
         baseUrl: internals.baseUrl,
         headers: {
             'Authorization': "Bearer a23c0852-5d99-4595-b801-101d761867de",
             //'Authorization': "Bearer " + internals.bearer,
-            'Accept': '...'
+            'Accept': 'SEE BELOW'
         }
     };
 
@@ -60,8 +136,7 @@ function fetch(orcId, format){
     });
     spinner.start();
 
-    console.log("make sure the second promise is created only after the first is fulfilled or rejected")
-    var promise =Wreck.getAsync(uri, options)
+    var promise = Wreck.getAsync(uri, options)
                     .then(function (data) {
 
                         debugger;
@@ -81,7 +156,6 @@ function fetch(orcId, format){
                         var name = getName(parsed);
 
                         console.log('  ' + cliText + ' done (' + name + ')');
-                        console.log('');
 
                         return {
                             payload: payload,
@@ -114,7 +188,31 @@ var id = setInterval(() => {
 }, 1000);
 */
 
+var p = Promise.resolve();
 orcIds.forEach(function(orcId, i){
+    return;
+    // todo: format (json/xml)
+    p = p.then(function(){
+
+            console.log("will call fetch")
+            return fetch(orcId, 'json');        
+        })
+        .then(function(obj){
+
+            //console.log("fetched data for " + obj.orcId + " (" +  obj.name + ")")
+
+            // todo: create option + directory for the output
+            return Fs.writeFileAsync(orcId + '.' + obj.format, obj.payload);
+        })
+        // todo: separate catch for some error related to writeFileAsync
+        .catch(function(err){
+
+            // todo: red
+            console.log(Chalk.red('ERROR: profile with id ' + err.orcId + ' was not retrieved ("' + err.statusCode + ': ' +  err.message + '")'));
+
+        });
+
+/*
     return;
     //delay
     Promise
@@ -137,6 +235,7 @@ orcIds.forEach(function(orcId, i){
             console.log(Chalk.red('ERROR: profile with id ' + err.orcId + ' was not retrieved ("' + err.statusCode + ': ' +  err.message + '")'));
 
         })
+*/
     
 })
 
@@ -176,6 +275,7 @@ function readBearerToken(){
     return bearer.toString();
 }
 
+/*
 var id = 0;
 function asyncTask(delay){
 
@@ -191,16 +291,27 @@ function asyncTask(delay){
 // asyncTask(1000)
 
 
-var delays = [2000, 1000];
+var delays = [2000, 1000, 2000];
 var p = Promise.resolve();
-delays.forEach(function(delay){
+delays.forEach(function(delay, i){
 
+    console.log("i: ", i)
     p = p.then(function(){
 
         return asyncTask(2000);
-    });
-});
+    })
+    .then(function(){
 
+        console.log("something sync")
+        if(i%2!==0){
+            throw new Error("error at " + i)
+        }
+    })
+    .catch(function(err){
+        console.log(err.message)
+    })
+});
+*/
 
 /*
 console.log("before the code")
