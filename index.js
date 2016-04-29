@@ -27,7 +27,7 @@ internals.baseUrl = 'https://pub.orcid.org/'
 //     '0000-0001-6897-2074',  // paulo vieira
 // ];
 
-var orcIds = [], names = [];
+//var orcIds = [];
 
 // process.on("SIGINT", function(){
 //     console.log("\nAborting operation. Goodbye!");
@@ -42,34 +42,26 @@ p1 = p1.then(function(){
 
     return Fs.readFileAsync('./ORCID CCIAM - Folha1.csv', 'utf8');
 })
-.then(function(csvData){
+
+p1 = p1.then(function(csvData){
 
     return CsvParseAsync(csvData);
 })
-.then(function(array){
-    
-    //console.log(array);
-    array.forEach(function(pair, i){
 
-        if(i===0){ return; }
-
-        orcIds.push(pair[0]);
-        names.push(pair[1]);
-    });
-})
-.catch(function(err){
-
-    throw err;
-})
-.then(function(){
+p1 = p1.then(function(orcIds){
 
     var p2 = Promise.resolve();
+
+    // we don't care about the first element of the array (header)
+    orcIds.shift();
     orcIds.forEach(function(orcId, i){
+
+        console.log(orcId)
         //return;
         // todo: format (json/xml)
         p2 = p2.then(function(){
 
-                return fetch(orcId, 'json');        
+                return fetch(orcId[0], orcId[1], 'json');        
             })
             .then(function(obj){
 
@@ -82,29 +74,28 @@ p1 = p1.then(function(){
             .catch(function(err){
 
                 // todo: red
-                console.log(Chalk.red(`  ERROR: profile with orcid ${ err.orcId } was not retrieved - "Status: ${ err.statusCode } ${ err.message }"`));
+                console.log(Chalk.red(`  ERROR: profile with orcid ${ err.orcId } (${ err.csvName}) was not retrieved - "Status: ${ err.statusCode } ${ err.message }"`));
 
             });
-       
     })
+
+    return p2;
+    
 })
-.then(function(){
 
-    //console.log("all done!")
+p1 = p1.then(function(){
+
+    console.log("All done. Goobye!")
 })
 
-/*
-CsvParse(csvData, {}, function(err, data){
+p1 = p1.catch(function(err){
 
-    if(err){
-        throw err;
-    }
-
-    console.log(data)
+    throw err;
 })
-*/
 
-function fetch(orcId, format){
+
+
+function fetch(orcId, csvName, format){
 
     //var uri = `/v1.2/${ orcId }/orcid-profile/`;
     var uri = '/v1.2/' + orcId + '/orcid-profile/';
@@ -149,6 +140,7 @@ function fetch(orcId, format){
                             var err = new Error(res.statusMessage);
                             err.statusCode = res.statusCode;
                             err.orcId = orcId;
+                            err.csvName = csvName;
                             throw err;
                         }
                         
@@ -188,7 +180,9 @@ var id = setInterval(() => {
 }, 1000);
 */
 
+/*
 var p = Promise.resolve();
+
 orcIds.forEach(function(orcId, i){
     return;
     // todo: format (json/xml)
@@ -211,6 +205,9 @@ orcIds.forEach(function(orcId, i){
             console.log(Chalk.red('ERROR: profile with id ' + err.orcId + ' was not retrieved ("' + err.statusCode + ': ' +  err.message + '")'));
 
         });
+    
+})
+*/
 
 /*
     return;
@@ -236,9 +233,6 @@ orcIds.forEach(function(orcId, i){
 
         })
 */
-    
-})
-
 
 function parse(payload, format){
 
