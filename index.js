@@ -18,7 +18,8 @@ var CsvParseAsync = Promise.promisify(require("csv-parse"));
 
 var internals = {};
 
-internals.baseUrl = 'https://pub.orcid.org/'
+internals.baseUrl = 'https://pub.orcid.org/';
+internals.format = "xml";
 
 //internals.bearer = readBearerToken();
 //console.log("internals.bearer", internals.bearer)
@@ -56,27 +57,25 @@ p1 = p1.then(function(orcIds){
     orcIds.shift();
     orcIds.forEach(function(orcId, i){
 
-        console.log(orcId)
-        //return;
         // todo: format (json/xml)
         p2 = p2.then(function(){
 
-                return fetch(orcId[0], orcId[1], 'json');        
+                return fetch(orcId[0], orcId[1], internals.format);
             })
             .then(function(obj){
-
-                //console.log("fetched data for " + obj.orcId + " (" +  obj.name + ")")
-
+                
                 // todo: create option + directory for the output
-                return Fs.writeFileAsync(orcId + '.' + obj.format, obj.payload);
+                var filename = orcId[0] + '.' + internals.format;
+                return Fs.writeFileAsync(filename, obj.payload);
             })
-            // todo: separate catch for some error related to writeFileAsync
             .catch(function(err){
 
                 // todo: red
                 console.log(Chalk.red(`  ERROR: profile with orcid ${ err.orcId } (${ err.csvName}) was not retrieved - "Status: ${ err.statusCode } ${ err.message }"`));
 
-            });
+            })
+            // todo: separate catch for some error related to writeFileAsync
+
     })
 
     return p2;
@@ -95,7 +94,7 @@ p1 = p1.catch(function(err){
 
 
 
-function fetch(orcId, csvName, format){
+function fetch(orcId, csvName){
 
     //var uri = `/v1.2/${ orcId }/orcid-profile/`;
     var uri = '/v1.2/' + orcId + '/orcid-profile/';
@@ -110,10 +109,10 @@ function fetch(orcId, csvName, format){
         }
     };
 
-    if(format === 'json'){
+    if(internals.format === 'json'){
         options.headers['Accept'] = 'application/orcid+json';
     }
-    else if(format === 'xml'){
+    else if(internals.format === 'xml'){
         options.headers['Accept'] = 'application/orcid+xml';
     }
     else{
@@ -130,11 +129,10 @@ function fetch(orcId, csvName, format){
     var promise = Wreck.getAsync(uri, options)
                     .then(function (data) {
 
-                        debugger;
-                        var res = data[0], payload = data[1];
-
                         spinner.stop();
 
+                        //debugger;
+                        var res = data[0];
                         if(res.statusCode>=400){
                             debugger;
                             var err = new Error(res.statusMessage);
@@ -144,8 +142,9 @@ function fetch(orcId, csvName, format){
                             throw err;
                         }
                         
-                        var parsed = parse(payload, format);
-                        var name = getName(parsed);
+                        var payload = data[1];
+                        //var obj = parse(payload.toString());
+                        var name = getName(payload.toString());
 
                         console.log('  ' + cliText + ' done (' + name + ')');
 
@@ -234,34 +233,46 @@ orcIds.forEach(function(orcId, i){
         })
 */
 
-function parse(payload, format){
+function getName(payload){
 
-    var parsed;
-    if(format === 'json'){
+    var firstName, lastName;
+    
+    if(internals.format === 'json'){
         // todo: try catch (because the json might be malformed)
-        
+    
+        var parsedObj;    
         try{
-            parsed = JSON.parse(payload)
+            parsedObj = JSON.parse(payload)
         }
         catch(e){
             throw err;
         }
 
-        return parsed;
-    }
+        firstName = parsedObj['orcid-profile']['orcid-bio']['personal-details']['given-names']['value'];
+        lastName = parsedObj['orcid-profile']['orcid-bio']['personal-details']['family-name']['value'];
 
-    if(format === 'xml'){
-        throw new Error("xml - to be done")
+        return firstName + " " + lastName;
     }
+    else if(internals.format === 'xml'){
+
+        XmlToJs.parseString(payload, function(err, parsedObj){
+
+            if(err){
+                throw err;
+            }
+
+            firstName = parsedObj["orcid-message"]["orcid-profile"][0]['orcid-bio'][0]['personal-details'][0]['given-names'][0];
+            lastName = parsedObj["orcid-message"]["orcid-profile"][0]['orcid-bio'][0]['personal-details'][0]['family-name'][0];
+        });
+
+        return firstName + " " + lastName;
+    }
+    else{
+        throw new Error('Unknown format (should be "xml" or "json")');
+    }
+    
 }
 
-function getName(obj){
-
-    var firstName = obj['orcid-profile']['orcid-bio']['personal-details']['given-names']['value'];
-    var lastName = obj['orcid-profile']['orcid-bio']['personal-details']['family-name']['value'];
-
-    return firstName + " " + lastName;
-}
 
 function readBearerToken(){
 
