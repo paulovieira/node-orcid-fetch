@@ -6,6 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "bin": {
+    "orcid-fetch": "./lib/index.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/paulovieira/node-orcid-fetch.git"
@@ -22,6 +25,7 @@
     "commander": "^2.9.0",
     "csv-parse": "^1.1.0",
     "ora": "^0.2.1",
+    "shelljs": "^0.7.0",
     "wreck": "^7.1.0",
     "xml2js": "^0.4.16"
   }
